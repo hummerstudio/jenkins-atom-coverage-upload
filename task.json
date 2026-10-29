@@ -1,7 +1,7 @@
 {
   "atomCode": "coverage-upload",
   "name": "Coverage report",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Reads JaCoCo or Cobertura XML, shows the numbers and gates the build on a threshold.",
   "execution": {
     "packagePath": "coverage-upload.jar",
