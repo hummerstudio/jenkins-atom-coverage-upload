@@ -1,0 +1,11 @@
+{
+  "name": "Coverage report",
+  "summary": "Reads JaCoCo or Cobertura XML, shows the numbers and gates the build on a threshold.",
+  "author": "hummerstudio",
+  "license": "MIT",
+  "tags": [
+    "official-port",
+    "coverage-upload"
+  ],
+  "homepage": "https://github.com/hummerstudio/jenkins-atom-coverage-upload"
+}

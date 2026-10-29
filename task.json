@@ -1,0 +1,62 @@
+{
+  "atomCode": "coverage-upload",
+  "name": "Coverage report",
+  "version": "1.0.0",
+  "description": "Reads JaCoCo or Cobertura XML, shows the numbers and gates the build on a threshold.",
+  "execution": {
+    "packagePath": "coverage-upload.jar",
+    "language": "java",
+    "target": "$atom_java_path -cp coverage-upload.jar com.jenkinschina.atom.sdk.AtomRunner"
+  },
+  "input": {
+    "pattern": {
+      "label": "报告文件 glob（逗号分隔）",
+      "type": "vuex-input",
+      "default": "**/jacoco.xml, **/cobertura-coverage.xml, **/coverage.xml"
+    },
+    "label": {
+      "label": "报告名称",
+      "type": "vuex-input",
+      "default": "Coverage"
+    },
+    "outputDir": {
+      "label": "HTML 输出目录",
+      "type": "vuex-input",
+      "default": "out/coverage"
+    },
+    "minLine": {
+      "label": "行覆盖率下限（%，0 = 不检查）",
+      "type": "vuex-input",
+      "default": "0"
+    },
+    "minBranch": {
+      "label": "分支覆盖率下限（%，0 = 不检查）",
+      "type": "vuex-input",
+      "default": "0"
+    }
+  },
+  "output": {
+    "lineCoverage": {
+      "type": "string",
+      "description": "行覆盖率（保留两位）"
+    },
+    "branchCoverage": {
+      "type": "string",
+      "description": "分支覆盖率"
+    },
+    "files": {
+      "type": "string",
+      "description": "解析的报告数"
+    },
+    "report": {
+      "type": "report",
+      "description": "构建页内嵌报告"
+    }
+  },
+  "x-jenkins": {
+    "protocol": "jenkins-1",
+    "requires": {
+      "runner": ">=0.4.0"
+    }
+  }
+}
