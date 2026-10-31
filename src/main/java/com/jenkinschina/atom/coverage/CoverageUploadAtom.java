@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
+import java.io.BufferedReader;
 import java.nio.file.Path;
 import java.nio.file.PathMatcher;
 import java.util.ArrayList;
@@ -107,9 +108,12 @@ public class CoverageUploadAtom implements AtomTask {
         return found;
     }
 
-    /** One report file. JaCoCo counts counters; Cobertura states rates on the root element. */
+    /** One report file. JaCoCo counts counters; Cobertura states rates; lcov is text; Sonar states per line. */
     private static Row parse(Path file) {
         try {
+            if (looksLikeLcov(file)) {
+                return parseLcov(file);
+            }
             DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
             factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
             factory.setExpandEntityReferences(false);
@@ -142,6 +146,10 @@ public class CoverageUploadAtom implements AtomTask {
                 return row;
             }
 
+            if ("coverage".equals(root.getTagName()) && !root.hasAttribute("line-rate")) {
+                return parseSonarGeneric(root, file.getFileName().toString());
+            }
+
             if ("coverage".equals(root.getTagName())) { // Cobertura
                 double lineRate = toDouble(root.getAttribute("line-rate"), -1);
                 double branchRate = toDouble(root.getAttribute("branch-rate"), -1);
@@ -160,6 +168,89 @@ public class CoverageUploadAtom implements AtomTask {
         } catch (Exception e) {
             return null;
         }
+    }
+
+
+    /** lcov is a text file of records: TN/SF then LF (lines found), LH (lines hit), BRF/BRH for branches. */
+    private static boolean looksLikeLcov(Path file) {
+        String name = file.getFileName().toString().toLowerCase(Locale.ROOT);
+        if (name.endsWith(".info") || name.endsWith(".lcov")) {
+            return true;
+        }
+        try (BufferedReader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
+            String line;
+            int seen = 0;
+            while ((line = reader.readLine()) != null && seen++ < 40) {
+                String trimmed = line.trim();
+                if (trimmed.isEmpty() || trimmed.startsWith("#")) {
+                    continue;
+                }
+                return trimmed.startsWith("TN:") || trimmed.startsWith("SF:") || trimmed.startsWith("LF:");
+            }
+        } catch (IOException e) {
+            return false;
+        }
+        return false;
+    }
+
+    private static Row parseLcov(Path file) throws IOException {
+        Row row = new Row(file.getFileName().toString());
+        int found = 0;
+        int hit = 0;
+        int branchesFound = 0;
+        int branchesHit = 0;
+        try (BufferedReader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                String trimmed = line.trim();
+                // accumulate per record and flush at end_of_record: LF/LH are per file, and their order is not fixed
+                if (trimmed.startsWith("LF:")) {
+                    found = toInt(trimmed.substring(3));
+                } else if (trimmed.startsWith("LH:")) {
+                    hit = toInt(trimmed.substring(3));
+                } else if (trimmed.startsWith("BRF:")) {
+                    branchesFound = toInt(trimmed.substring(4));
+                } else if (trimmed.startsWith("BRH:")) {
+                    branchesHit = toInt(trimmed.substring(4));
+                } else if (trimmed.equals("end_of_record")) {
+                    row.lineCovered += Math.min(hit, found);
+                    row.lineMissed += Math.max(0, found - hit);
+                    row.branchCovered += Math.min(branchesHit, branchesFound);
+                    row.branchMissed += Math.max(0, branchesFound - branchesHit);
+                    found = 0;
+                    hit = 0;
+                    branchesFound = 0;
+                    branchesHit = 0;
+                }
+            }
+        }
+        // a truncated file may have no end_of_record
+        row.lineCovered += Math.min(hit, found);
+        row.lineMissed += Math.max(0, found - hit);
+        row.branchCovered += Math.min(branchesHit, branchesFound);
+        row.branchMissed += Math.max(0, branchesFound - branchesHit);
+        return row.lineCovered + row.lineMissed == 0 && row.branchCovered + row.branchMissed == 0 ? null : row;
+    }
+
+    /** Sonar's generic coverage: <coverage version="1"><file path="…"><lineToCover lineNumber covered …/></file>. */
+    private static Row parseSonarGeneric(Element root, String name) {
+        Row row = new Row(name);
+        NodeList lines = root.getElementsByTagName("lineToCover");
+        for (int i = 0; i < lines.getLength(); i++) {
+            Element line = (Element) lines.item(i);
+            if ("true".equalsIgnoreCase(line.getAttribute("covered"))) {
+                row.lineCovered++;
+            } else {
+                row.lineMissed++;
+            }
+            int branches = toInt(line.getAttribute("branchesToCover"));
+            if (branches > 0) {
+                int covered = toInt(line.getAttribute("coveredBranches"));
+                row.branchCovered += covered;
+                row.branchMissed += Math.max(0, branches - covered);
+            }
+        }
+        return row.lineCovered + row.lineMissed == 0 ? null : row;
     }
 
     private static String render(String label, String pattern, Totals totals, List<Row> rows,

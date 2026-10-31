@@ -48,4 +48,47 @@ printf '{"pattern": "**/jacoco.xml"}' >"$dir/input.json"
 run "$dir" >/dev/null 2>&1 && fail "a missing report must fail"
 grep -q "no coverage report matched" "$dir/output.json" || fail "message not readable"
 
-echo "smoke ok: jacoco counters, threshold gate, cobertura rates, missing report"
+# 5. lcov: two records, LF/LH order swapped in the second one, branches too
+dir="$(mktemp -d)"; mkdir -p "$dir/build/coverage"
+cat >"$dir/build/coverage/lcov.info" <<'LCOV'
+TN:
+SF:src/calc.c
+LF:10
+LH:8
+BRF:4
+BRH:2
+end_of_record
+TN:
+SF:src/main.c
+LH:5
+LF:5
+BRF:0
+BRH:0
+end_of_record
+LCOV
+printf '{"pattern": "**/lcov.info"}' >"$dir/input.json"
+run "$dir" >/dev/null 2>&1 || fail "lcov run failed: $(cat "$dir/output.json")"
+[ "$(output "$dir" lineCoverage)" = "86.67" ] || fail "lcov line coverage must be 13/15: $(cat "$dir/output.json")"
+[ "$(output "$dir" branchCoverage)" = "50.00" ] || fail "lcov branch coverage: $(cat "$dir/output.json")"
+
+# 6. Sonar generic format: per-line, with branches on some lines
+dir="$(mktemp -d)"
+cat >"$dir/generic-coverage.xml" <<'SONAR'
+<coverage version="1">
+  <file path="src/app.py">
+    <lineToCover lineNumber="1" covered="true"/>
+    <lineToCover lineNumber="2" covered="true" branchesToCover="2" coveredBranches="1"/>
+    <lineToCover lineNumber="3" covered="false"/>
+    <lineToCover lineNumber="4" covered="false" branchesToCover="2" coveredBranches="0"/>
+  </file>
+</coverage>
+SONAR
+printf '{"pattern": "**/generic-coverage.xml", "minLine": "60"}' >"$dir/input.json"
+run "$dir" >/dev/null 2>&1 && fail "50%% lines is under a 60%% gate, it must fail"
+grep -q "below the threshold" "$dir/output.json" || fail "gate message: $(cat "$dir/output.json")"
+printf '{"pattern": "**/generic-coverage.xml"}' >"$dir/input.json"
+run "$dir" >/dev/null 2>&1 || fail "sonar run failed: $(cat "$dir/output.json")"
+[ "$(output "$dir" lineCoverage)" = "50.00" ] || fail "sonar line coverage: $(cat "$dir/output.json")"
+[ "$(output "$dir" branchCoverage)" = "25.00" ] || fail "sonar branch coverage: $(cat "$dir/output.json")"
+
+echo "smoke ok: jacoco counters, threshold gate, cobertura rates, missing report, lcov records, sonar generic"

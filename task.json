@@ -1,7 +1,7 @@
 {
   "atomCode": "coverage-upload",
   "name": "Coverage report",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Reads JaCoCo or Cobertura XML, shows the numbers and gates the build on a threshold.",
   "execution": {
     "packagePath": "coverage-upload.jar",
@@ -12,7 +12,7 @@
     "pattern": {
       "label": "报告文件 glob（逗号分隔）",
       "type": "vuex-input",
-      "default": "**/jacoco.xml, **/cobertura-coverage.xml, **/coverage.xml"
+      "default": "**/jacoco.xml, **/cobertura-coverage.xml, **/coverage.xml, **/lcov.info"
     },
     "label": {
       "label": "报告名称",
