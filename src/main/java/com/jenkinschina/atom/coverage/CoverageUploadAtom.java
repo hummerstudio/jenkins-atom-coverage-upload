@@ -43,10 +43,14 @@ public class CoverageUploadAtom implements AtomTask {
 
         Totals totals = new Totals();
         List<Row> rows = new ArrayList<>();
+        List<String> unreadable = new ArrayList<>();
         for (Path file : files) {
             Row row = parse(file);
             if (row == null) {
+                // a report that cannot be parsed used to be skipped, so the percentage and the gate were
+                // computed over whatever happened to be readable
                 totals.unreadable++;
+                unreadable.add(file.getFileName().toString());
                 continue;
             }
             rows.add(row);
@@ -57,6 +61,13 @@ public class CoverageUploadAtom implements AtomTask {
         }
         if (rows.isEmpty()) {
             return AtomResult.error(ErrorType.USER, 40002, "no readable coverage report in " + pattern);
+        }
+        boolean allowUnreadable = context.getBooleanParam("allowUnreadableReports", false);
+        if (!unreadable.isEmpty() && !allowUnreadable) {
+            return AtomResult.error(ErrorType.USER, 40003,
+                    unreadable.size() + " of " + files.size() + " coverage report(s) could not be parsed: "
+                            + String.join(", ", unreadable)
+                            + " (set allowUnreadableReports=true to accept this)");
         }
 
         double linePercent = totals.linePercent();
@@ -76,7 +87,11 @@ public class CoverageUploadAtom implements AtomTask {
                 .data("files", String.valueOf(rows.size()))
                 .report("report", label, dir.toString(), "index.html");
 
-        if (linePercent + 1e-9 < minLine || branchPercent + 1e-9 < minBranch) {
+        // branchPercent is -1 when the reports carry no branch data at all (jacoco without execution data,
+        // which is what a report-only build produces). Enforcing a branch gate on "no data" failed every
+        // such build at minBranch=0; the percentages are still reported, only the gate is skipped.
+        boolean branchKnown = branchPercent >= 0;
+        if (linePercent + 1e-9 < minLine || (branchKnown && branchPercent + 1e-9 < minBranch)) {
             return AtomResult.failure(String.format(Locale.ROOT,
                     "coverage below the threshold: line %.2f%% (min %.2f%%), branch %.2f%% (min %.2f%%)",
                     linePercent, minLine, branchPercent, minBranch))

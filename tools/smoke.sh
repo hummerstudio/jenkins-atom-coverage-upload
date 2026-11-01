@@ -91,4 +91,15 @@ run "$dir" >/dev/null 2>&1 || fail "sonar run failed: $(cat "$dir/output.json")"
 [ "$(output "$dir" lineCoverage)" = "50.00" ] || fail "sonar line coverage: $(cat "$dir/output.json")"
 [ "$(output "$dir" branchCoverage)" = "25.00" ] || fail "sonar branch coverage: $(cat "$dir/output.json")"
 
-echo "smoke ok: jacoco counters, threshold gate, cobertura rates, missing report, lcov records, sonar generic"
+# a truncated report must not be averaged into the percentage the gate runs on
+dir="$(mktemp -d)"
+printf '<report name="good"><counter type="LINE" missed="0" covered="10"/></report>' >"$dir/jacoco.xml"
+printf '<report name="half"><counter type="LINE" missed="0"' >"$dir/jacoco-old.xml"
+printf '{"pattern": "*.xml", "minLine": "50"}' >"$dir/input.json"
+if run "$dir" >/dev/null 2>&1; then fail "a truncated coverage report must fail the gate"; fi
+grep -q '"errorCode":40003' "$dir/output.json" || fail "expected errorCode 40003: $(cat "$dir/output.json")"
+grep -q 'jacoco-old.xml' "$dir/output.json" || fail "the failure must name the file: $(cat "$dir/output.json")"
+printf '{"pattern": "*.xml", "minLine": "50", "allowUnreadableReports": "true"}' >"$dir/input.json"
+run "$dir" >/dev/null 2>&1 || fail "allowUnreadableReports should let it through: $(cat "$dir/output.json")"
+
+echo "smoke ok: jacoco counters, threshold gate, cobertura rates, missing report, lcov records, sonar generic, truncated report fails by default"
