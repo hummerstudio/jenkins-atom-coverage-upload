@@ -102,4 +102,27 @@ grep -q 'jacoco-old.xml' "$dir/output.json" || fail "the failure must name the f
 printf '{"pattern": "*.xml", "minLine": "50", "allowUnreadableReports": "true"}' >"$dir/input.json"
 run "$dir" >/dev/null 2>&1 || fail "allowUnreadableReports should let it through: $(cat "$dir/output.json")"
 
-echo "smoke ok: jacoco counters, threshold gate, cobertura rates, missing report, lcov records, sonar generic, truncated report fails by default"
+# Clover: <coverage><project><metrics> — the counts are statements, not rates
+dir="$(mktemp -d)"
+cat >"$dir/clover.xml" <<'XML'
+<coverage generated="1793600000000" clover="4.5.2">
+  <project timestamp="1793600000000" name="demo">
+    <metrics statements="200" coveredstatements="150" conditionals="40" coveredconditionals="30"
+             methods="20" coveredmethods="15" elements="260" coveredelements="195" complexity="0"/>
+    <package name="demo">
+      <file name="Calc.java">
+        <metrics statements="10" coveredstatements="1" conditionals="2" coveredconditionals="0"/>
+      </file>
+    </package>
+  </project>
+</coverage>
+XML
+printf '{"pattern": "*.xml", "minLine": "70"}' >"$dir/input.json"
+run "$dir" >"$dir/log.txt" 2>&1 || fail "clover: $(cat "$dir/output.json")"
+[ "$(output "$dir" lineCoverage)" = "75.00" ] || fail "clover line coverage: $(cat "$dir/output.json")"
+[ "$(output "$dir" branchCoverage)" = "75.00" ] || fail "clover branch coverage: $(cat "$dir/output.json")"
+# the per-file <metrics> must not be mistaken for the project total
+grep -q '"lineCoverage":{"type":"string","value":"75.00"}' "$dir/output.json" \
+  || fail "a file-level metrics node was used as the total: $(cat "$dir/output.json")"
+
+echo "smoke ok: jacoco counters, threshold gate, cobertura rates, missing report, lcov records, sonar generic, clover, truncated report fails by default"

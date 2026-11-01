@@ -162,6 +162,11 @@ public class CoverageUploadAtom implements AtomTask {
             }
 
             if ("coverage".equals(root.getTagName()) && !root.hasAttribute("line-rate")) {
+                // Clover is also <coverage> without line-rate: its counts live in <project><metrics statements=…>
+                Row clover = parseClover(document, file.getFileName().toString());
+                if (clover != null) {
+                    return clover;
+                }
                 return parseSonarGeneric(root, file.getFileName().toString());
             }
 
@@ -248,6 +253,31 @@ public class CoverageUploadAtom implements AtomTask {
     }
 
     /** Sonar's generic coverage: <coverage version="1"><file path="…"><lineToCover lineNumber covered …/></file>. */
+    /** Clover: {@code <coverage><project><metrics statements coveredstatements conditionals coveredconditionals/>}. */
+    private static Row parseClover(Document document, String name) {
+        NodeList metrics = document.getElementsByTagName("metrics");
+        for (int i = 0; i < metrics.getLength(); i++) {
+            Element element = (Element) metrics.item(i);
+            if (!element.hasAttribute("statements")) {
+                continue;               // a <file>/<class> metrics node counts only that node
+            }
+            Element parent = (Element) element.getParentNode();
+            if (parent == null || !"project".equals(parent.getTagName())) {
+                continue;               // the project total is the only one worth reporting
+            }
+            Row row = new Row(name);
+            row.lineCovered = toInt(element.getAttribute("coveredstatements"));
+            row.lineMissed = Math.max(0, toInt(element.getAttribute("statements")) - row.lineCovered);
+            if (element.hasAttribute("conditionals")) {
+                row.branchCovered = toInt(element.getAttribute("coveredconditionals"));
+                row.branchMissed = Math.max(0,
+                        toInt(element.getAttribute("conditionals")) - row.branchCovered);
+            }
+            return row.lineCovered + row.lineMissed == 0 ? null : row;
+        }
+        return null;
+    }
+
     private static Row parseSonarGeneric(Element root, String name) {
         Row row = new Row(name);
         NodeList lines = root.getElementsByTagName("lineToCover");
