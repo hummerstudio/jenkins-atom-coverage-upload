@@ -27,5 +27,5 @@ jobs:
         run: ./tools/smoke.sh
       - uses: actions/upload-artifact@v4
         with:
-          name: coverage-upload-atom
-          path: dist/coverage-upload/
+          name: coverage-atom
+          path: dist/coverage/

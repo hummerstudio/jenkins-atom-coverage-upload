@@ -35,9 +35,9 @@ mkdir -p "$classes/META-INF/services"
 cp src/main/resources/META-INF/services/* "$classes/META-INF/services/"
 ( cd "$sdk" && "$JAR" xf "$SDK_JAR" && rm -rf META-INF/MANIFEST.MF META-INF/services )
 
-rm -rf dist/coverage-upload
-mkdir -p dist/coverage-upload
-"$JAR" --create --file dist/coverage-upload/coverage-upload.jar -C "$classes" . -C "$sdk" .
-cp task.json dist/coverage-upload/
-[ -f meta.json ] && cp meta.json dist/coverage-upload/
-echo "built dist/coverage-upload: $(ls dist/coverage-upload | tr '\n' ' ')"
+rm -rf dist/coverage
+mkdir -p dist/coverage
+"$JAR" --create --file dist/coverage/coverage.jar -C "$classes" . -C "$sdk" .
+cp task.json dist/coverage/
+[ -f meta.json ] && cp meta.json dist/coverage/
+echo "built dist/coverage: $(ls dist/coverage | tr '\n' ' ')"

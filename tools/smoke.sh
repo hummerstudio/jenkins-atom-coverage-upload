@@ -8,6 +8,8 @@ cd "$(dirname "$0")/.."
 # 1. JaCoCo: 30 covered / 10 missed lines, 4/4 branches
 dir="$(mktemp -d)"; mkdir -p "$dir/target/site/jacoco"
 cat >"$dir/target/site/jacoco/jacoco.xml" <<'XML'
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!DOCTYPE report PUBLIC "-//JACOCO//DTD Report 1.1//EN" "report.dtd">
 <report name="parcel">
   <package name="demo"><class name="demo/A"><counter type="LINE" missed="10" covered="30"/></class></package>
   <counter type="LINE" missed="10" covered="30"/>
@@ -35,6 +37,7 @@ run "$dir" >/dev/null 2>&1 && fail "60%% < 80%% must fail the atom"
 # 3. Cobertura rates are read from the root element
 dir="$(mktemp -d)"; mkdir -p "$dir/coverage"
 cat >"$dir/coverage/cobertura-coverage.xml" <<'XML'
+<!DOCTYPE coverage SYSTEM "http://cobertura.sourceforge.net/xml/coverage-04.dtd">
 <coverage line-rate="0.8" branch-rate="0.5" version="1"><packages/></coverage>
 XML
 printf '{"pattern": "**/cobertura-coverage.xml", "minLine": "70"}' >"$dir/input.json"

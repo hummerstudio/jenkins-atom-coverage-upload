@@ -25,7 +25,7 @@ import org.w3c.dom.NodeList;
  * <p>The gate is the point: a coverage report nobody reads changes nothing. Thresholds default to off, so an
  * existing job that just wants the number is not broken by an atom upgrade.
  */
-public class CoverageUploadAtom implements AtomTask {
+public class CoverageAtom implements AtomTask {
 
     @Override
     public AtomResult run(AtomContext context) throws Exception {
@@ -129,10 +129,19 @@ public class CoverageUploadAtom implements AtomTask {
             if (looksLikeLcov(file)) {
                 return parseLcov(file);
             }
+            // JaCoCo and Cobertura both ship a DOCTYPE, so refusing one outright refuses the two most common
+            // coverage formats. The risk is external entities, not the declaration: block those, keep the DOCTYPE.
             DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", false);
+            factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+            factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+            factory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+            factory.setXIncludeAware(false);
             factory.setExpandEntityReferences(false);
-            Document document = factory.newDocumentBuilder().parse(file.toFile());
+            javax.xml.parsers.DocumentBuilder builder = factory.newDocumentBuilder();
+            builder.setEntityResolver((publicId, systemId) ->
+                    new org.xml.sax.InputSource(new java.io.StringReader("")));
+            Document document = builder.parse(file.toFile());
             Element root = document.getDocumentElement();
             if (root == null) {
                 return null;
