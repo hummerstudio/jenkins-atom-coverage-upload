@@ -37,4 +37,4 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: coverage-atom
-          path: atom/dist/coverage/
+          path: atom/target/dist/coverage/
